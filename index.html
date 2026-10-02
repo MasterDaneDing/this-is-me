@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>This is me</title>
+<style>
+  :root {
+    --ink: #1c2430;
+    --paper: #fff8ee;
+    --band: #1f4e9a;
+    --band2: #f4c542;
+    --chip: #eef3fb;
+    --line: #d7deea;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+    color: var(--ink);
+    background: #e7eef8;
+    min-height: 100%;
+  }
+  header {
+    background: var(--band);
+    color: white;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  header h1 { margin: 0; font-size: 22px; letter-spacing: 0.2px; }
+  header p { margin: 2px 0 0; font-size: 13px; opacity: 0.9; }
+  .wrap {
+    display: grid;
+    grid-template-columns: minmax(280px, 460px) 1fr;
+    gap: 14px;
+    padding: 14px;
+    max-width: 1180px;
+    margin: 0 auto;
+  }
+  @media (max-width: 860px) {
+    .wrap { grid-template-columns: 1fr; }
+  }
+  .stage-card, .panel {
+    background: white;
+    border-radius: 18px;
+    box-shadow: 0 8px 24px rgba(28, 36, 48, 0.08);
+  }
+  .stage-card { padding: 12px 12px 8px; }
+  .stage {
+    position: relative;
+    width: min(100%, 440px);
+    margin: 0 auto;
+    aspect-ratio: 3 / 4.05;
+    background:
+      radial-gradient(circle at 50% 18%, #fff 0 70px, transparent 71px),
+      linear-gradient(#fffdf8, var(--paper));
+    border: 3px solid #1c2430;
+    border-radius: 16px;
+    overflow: hidden;
+    touch-action: none;
+  }
+  .guide {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+  }
+  canvas.paint {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    touch-action: none;
+  }
+  canvas.under { z-index: 2; pointer-events: none; }
+  canvas.over { z-index: 12; pointer-events: none; }
+  canvas.over.live { pointer-events: auto; cursor: crosshair; }
+  .slot {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    z-index: 4;
+    pointer-events: auto;
+    touch-action: none;
+  }
+  .slot img {
+    width: 100%;
+    height: auto;
+    display: block;
+    user-select: none;
+    -webkit-user-drag: none;
+    pointer-events: none;
+  }
+  .slot.selected { z-index: 9; }
+  .slot.selected img { outline: 3px solid #f4c542; outline-offset: 2px; border-radius: 8px; }
+  .handle {
+    position: absolute;
+    right: -10px;
+    bottom: -10px;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: #f4c542;
+    border: 2px solid #1c2430;
+    cursor: nwse-resize;
+    touch-action: none;
+    display: none;
+  }
+  .slot.selected .handle { display: block; }
+  .sentence {
+    text-align: center;
+    font-size: 20px;
+    font-weight: 700;
+    margin: 10px 6px 4px;
+    min-height: 28px;
+  }
+  .sentence span { color: #1f4e9a; }
+  .panel { padding: 12px; }
+  .modes, .cats, .tools, .acts {
+    display: flex; flex-wrap: wrap; gap: 8px;
+  }
+  button, .swatch {
+    border: 2px solid #1c2430;
+    background: white;
+    border-radius: 999px;
+    padding: 8px 12px;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+    color: var(--ink);
+  }
+  button.on, .swatch.on { background: var(--band2); }
+  button.ghost { background: var(--chip); }
+  button.danger { background: #ffe8e4; }
+  .label { font-size: 13px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; margin: 12px 0 6px; color: #526079; }
+  .items {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+    gap: 8px;
+    max-height: 280px;
+    overflow: auto;
+    padding-bottom: 4px;
+  }
+  .item {
+    border: 2px solid var(--line);
+    border-radius: 12px;
+    background: #111;
+    padding: 4px;
+    cursor: pointer;
+    min-height: 78px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+  }
+  .item img { max-width: 100%; max-height: 72px; object-fit: contain; }
+  .item.on { outline: 3px solid var(--band2); border-color: #1c2430; }
+  .item small { display: none; }
+  .swatches { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .swatch { width: 36px; height: 36px; padding: 0; border-radius: 50%; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .hint { font-size: 13px; color: #526079; margin: 6px 0 0; }
+  .status { font-size: 14px; font-weight: 700; margin: 8px 0 0; min-height: 20px; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>This is me</h1>
+    <p>Dress up. Draw yourself. Pick what you will do.</p>
+  </div>
+  <button id="saveBtn" type="button">Send picture</button>
+</header>
+<div class="wrap">
+  <section class="stage-card">
+    <div class="stage" id="stage">
+      <svg class="guide" id="guide" viewBox="0 0 300 405" aria-hidden="true">
+        <g fill="none" stroke="#c9b8a4" stroke-width="3" stroke-dasharray="6 6">
+          <ellipse cx="150" cy="78" rx="38" ry="44"/>
+          <path d="M150 122 v28"/>
+          <path d="M112 168 q38 18 76 0"/>
+          <path d="M118 160 q-46 28 -28 92"/>
+          <path d="M182 160 q46 28 28 92"/>
+          <path d="M128 250 q-8 70 4 120"/>
+          <path d="M172 250 q8 70 -4 120"/>
+        </g>
+      </svg>
+      <canvas class="paint under" id="under"></canvas>
+      <div class="slot bottom" id="slotBottom"></div>
+      <div class="slot shoes" id="slotShoes"></div>
+      <div class="slot top" id="slotTop"></div>
+      <div class="slot pads" id="slotPads"></div>
+      <div class="slot helmet" id="slotHelmet"></div>
+      <canvas class="paint over" id="over"></canvas>
+    </div>
+    <div class="sentence" id="sentence">This is me. I will <span>…</span></div>
+  </section>
+  <section class="panel">
+    <div class="modes">
+      <button type="button" id="modeDraw" class="on">1. Draw me</button>
+      <button type="button" id="modeDress">2. Move clothes</button>
+    </div>
+    <div id="drawBox">
+      <div class="label">Skin, hair, eyes</div>
+      <div class="swatches" id="swatches"></div>
+      <div class="label">Brush</div>
+      <div class="row">
+        <button type="button" class="size on" data-size="10">Small</button>
+        <button type="button" class="size" data-size="20">Medium</button>
+        <button type="button" class="size" data-size="36">Big</button>
+        <button type="button" id="eraser">Eraser</button>
+        <button type="button" id="undoBtn" class="ghost">Undo</button>
+        <button type="button" id="clearDraw" class="danger">Clear drawing</button>
+      </div>
+      <p class="hint">Draw on top of the clothes. Put a neck in the shirt, a face in the helmet, feet in the shoes. Black is for eyes, nose and mouth. Use Move clothes if you need to drag a piece.</p>
+    </div>
+    <div id="dressBox" hidden>
+      <div class="label">Choose a piece</div>
+      <div class="cats" id="cats"></div>
+      <div class="items" id="items"></div>
+      <p class="hint">Drag a piece to move it. Pinch with two fingers to make it bigger or smaller. On a computer, drag the yellow corner. Tap again in the list to take it off.</p>
+      <div class="row" style="margin-top:10px">
+        <button type="button" class="ghost" id="clearClothes">Take off all clothes</button>
+        <button type="button" class="ghost" id="resetPlace">Reset place and size</button>
+        <button type="button" class="ghost" id="guideBtn">Hide guide</button>
+      </div>
+    </div>
+    <div class="label">This is me. I will…</div>
+    <div class="acts" id="acts"></div>
+    <div class="label">Your name</div>
+    <input id="pupilName" type="text" maxlength="40" placeholder="Name" style="width:100%;max-width:280px;border:2px solid #1c2430;border-radius:12px;padding:8px 10px;font:inherit">
+    <div class="bar">
+      <button type="button" id="saveBtn2">Send to class folder</button>
+      <button type="button" class="ghost" id="downloadBtn">Download only</button>
+    </div>
+    <p class="status" id="status"></p>
+  </section>
+</div>
+<script>
+const ITEMS = [
+  {id:"top-tccs-blue", slot:"top", cat:"Tops", label:"TCCS blue"},
+  {id:"top-tccs-pink", slot:"top", cat:"Tops", label:"TCCS pink"},
+  {id:"top-duck", slot:"top", cat:"Tops", label:"Duck"},
+  {id:"top-bunny", slot:"top", cat:"Tops", label:"Bunny"},
+  {id:"top-plane", slot:"top", cat:"Tops", label:"Plane"},
+  {id:"top-hat", slot:"top", cat:"Tops", label:"Hat"},
+  {id:"top-flowers", slot:"top", cat:"Tops", label:"Flowers"},
+  {id:"top-poo", slot:"top", cat:"Tops", label:"Silly"},
+  {id:"shorts-blue", slot:"bottom", kind:"shorts", cat:"Bottoms", label:"Blue shorts"},
+  {id:"shorts-green", slot:"bottom", kind:"shorts", cat:"Bottoms", label:"Green shorts"},
+  {id:"shorts-yellow", slot:"bottom", kind:"shorts", cat:"Bottoms", label:"Yellow shorts"},
+  {id:"shorts-teal", slot:"bottom", kind:"shorts", cat:"Bottoms", label:"Teal shorts"},
+  {id:"skirt-blue", slot:"bottom", kind:"skirt", cat:"Bottoms", label:"Blue skirt"},
+  {id:"skirt-lime", slot:"bottom", kind:"skirt", cat:"Bottoms", label:"Lime skirt"},
+  {id:"skirt-yellow", slot:"bottom", kind:"skirt", cat:"Bottoms", label:"Yellow skirt"},
+  {id:"skirt-green", slot:"bottom", kind:"skirt", cat:"Bottoms", label:"Green skirt"},
+  {id:"trousers-jeans", slot:"bottom", kind:"trousers", cat:"Bottoms", label:"Jeans"},
+  {id:"trousers-khaki", slot:"bottom", kind:"trousers", cat:"Bottoms", label:"Khaki"},
+  {id:"trousers-white", slot:"bottom", kind:"trousers", cat:"Bottoms", label:"White"},
+  {id:"trousers-patch", slot:"bottom", kind:"trousers", cat:"Bottoms", label:"Patch green"},
+  {id:"trousers-jeans-wide", slot:"bottom", kind:"trousers", cat:"Bottoms", label:"Wide jeans"},
+  {id:"trousers-khaki-wide", slot:"bottom", kind:"trousers", cat:"Bottoms", label:"Wide khaki"},
+  {id:"trousers-white-wide", slot:"bottom", kind:"trousers", cat:"Bottoms", label:"Wide white"},
+  {id:"trousers-patchwork", slot:"bottom", kind:"trousers", cat:"Bottoms", label:"Patchwork"},
+  {id:"shoes-flipflops-blue", slot:"shoes", cat:"Shoes", label:"Blue flips"},
+  {id:"shoes-flipflops-pink", slot:"shoes", cat:"Shoes", label:"Pink flips"},
+  {id:"shoes-sandals-brown", slot:"shoes", cat:"Shoes", label:"Brown sandals"},
+  {id:"shoes-sandals-tan", slot:"shoes", cat:"Shoes", label:"Tan sandals"},
+  {id:"shoes-boots-black", slot:"shoes", cat:"Shoes", label:"Boots"},
+  {id:"shoes-boots-black-w", slot:"shoes", cat:"Shoes", label:"Boots 2"},
+  {id:"shoes-trainers-white", slot:"shoes", cat:"Shoes", label:"Trainers"},
+  {id:"shoes-trainers-pink", slot:"shoes", cat:"Shoes", label:"Pink trainers"},
+  {id:"shoes-rollers-red", slot:"shoes", cat:"Shoes", label:"Red rollers"},
+  {id:"shoes-rollers-pink", slot:"shoes", cat:"Shoes", label:"Pink rollers"},
+  {id:"shoes-iceskates", slot:"shoes", cat:"Shoes", label:"Ice skates"},
+  {id:"shoes-iceskates-w", slot:"shoes", cat:"Shoes", label:"Ice skates 2"},
+  {id:"helmet-blue", slot:"helmet", cat:"Helmets", label:"Blue"},
+  {id:"helmet-rainbow", slot:"helmet", cat:"Helmets", label:"Rainbow"},
+  {id:"helmet-bunny", slot:"helmet", cat:"Helmets", label:"Bunny"},
+  {id:"helmet-dino", slot:"helmet", cat:"Helmets", label:"Dino"},
+  {id:"helmet-creeper", slot:"helmet", cat:"Helmets", label:"Blocks"},
+  {id:"pads-pink", slot:"pads", cat:"Pads", label:"Pink"},
+  {id:"pads-blue", slot:"pads", cat:"Pads", label:"Blue"},
+  {id:"pads-green", slot:"pads", cat:"Pads", label:"Green"},
+  {id:"pads-orange", slot:"pads", cat:"Pads", label:"Orange"},
+  {id:"pads-rainbow", slot:"pads", cat:"Pads", label:"Rainbow"},
+  {id:"pads-black", slot:"pads", cat:"Pads", label:"Black"},
+  {id:"pads-creeper", slot:"pads", cat:"Pads", label:"Blocks"}
+];
+const ACTS = [
+  ["go ice-skating", "ice-skating"],
+  ["go skateboarding", "skateboarding"],
+  ["do kung-fu", "kung-fu"],
+  ["do fencing", "fencing"],
+  ["do karate", "karate"],
+  ["play dodgebee", "dodgebee"],
+  ["go cycling", "cycling"],
+  ["play badminton", "badminton"]
+];
+const CATS = ["Tops", "Bottoms", "Shoes", "Helmets", "Pads"];
+const COLOURS = ["#f6d7b8", "#e8b98a", "#c68642", "#8d5524", "#4a2c1a", "#111111", "#6b3a1f", "#e2b007"];
+
+const worn = { top:null, bottom:null, shoes:null, helmet:null, pads:null };
+const DEFAULTS = {
+  top:     { x: 50, y: 36, w: 52 },
+  shorts:  { x: 50, y: 50, w: 40 },
+  skirt:   { x: 50, y: 48, w: 58 },
+  trousers:{ x: 50, y: 58, w: 40 },
+  shoes:   { x: 50, y: 86, w: 42 },
+  helmet:  { x: 50, y: 16, w: 40 },
+  pads:    { x: 50, y: 66, w: 34 }
+};
+const Z = { bottom: 4, top: 5, shoes: 6, pads: 6, helmet: 7 };
+const place = {};
+let selectedSlot = null;
+let cat = "Tops";
+let act = null;
+let colour = "#e8b98a";
+let size = 10;
+let erasing = false;
+let layer = "over";
+let dressMode = false;
+const undo = { under: [], over: [] };
+
+const slots = {
+  top: document.getElementById("slotTop"),
+  bottom: document.getElementById("slotBottom"),
+  shoes: document.getElementById("slotShoes"),
+  helmet: document.getElementById("slotHelmet"),
+  pads: document.getElementById("slotPads")
+};
+const stage = document.getElementById("stage");
+
+function src(id){
+  if (window.ITEM_SRC && ITEM_SRC[id]) return ITEM_SRC[id];
+  return "items/" + id + ".png";
+}
+
+function defaultsFor(item){
+  if (!item) return { x: 50, y: 50, w: 40 };
+  if (item.slot === "bottom") return Object.assign({}, DEFAULTS[item.kind] || DEFAULTS.trousers);
+  return Object.assign({}, DEFAULTS[item.slot]);
+}
+
+function applyPlace(key){
+  const el = slots[key];
+  const item = worn[key];
+  if (!item || !place[key]) return;
+  const p = place[key];
+  el.style.left = p.x + "%";
+  el.style.top = p.y + "%";
+  el.style.width = Math.max(12, Math.min(120, p.w)) + "%";
+  el.style.zIndex = (selectedSlot === key ? 9 : Z[key]);
+  el.classList.toggle("selected", selectedSlot === key);
+}
+
+function renderWorn(){
+  for (const key of Object.keys(slots)) {
+    const el = slots[key];
+    el.innerHTML = "";
+    el.className = "slot " + key;
+    el.style.pointerEvents = dressMode ? "auto" : "none";
+    const item = worn[key];
+    if (!item) { el.style.width = "0"; continue; }
+    if (!place[key]) place[key] = defaultsFor(item);
+    const img = document.createElement("img");
+    img.src = src(item.id);
+    img.alt = item.label;
+    el.appendChild(img);
+    const handle = document.createElement("div");
+    handle.className = "handle";
+    handle.dataset.resize = key;
+    el.appendChild(handle);
+    applyPlace(key);
+  }
+}
+
+function selectSlot(key){
+  selectedSlot = key;
+  for (const k of Object.keys(slots)) applyPlace(k);
+}
+
+function renderItems(){
+  const box = document.getElementById("items");
+  box.innerHTML = "";
+  ITEMS.filter(i => i.cat === cat).forEach(item => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "item" + (worn[item.slot] && worn[item.slot].id === item.id ? " on" : "");
+    b.title = item.label;
+    const img = document.createElement("img");
+    img.src = src(item.id);
+    img.alt = item.label;
+    b.appendChild(img);
+    b.addEventListener("click", () => {
+      if (worn[item.slot] && worn[item.slot].id === item.id) {
+        worn[item.slot] = null;
+        place[item.slot] = null;
+        if (selectedSlot === item.slot) selectedSlot = null;
+      } else {
+        worn[item.slot] = item;
+        place[item.slot] = defaultsFor(item);
+        selectedSlot = item.slot;
+      }
+      renderWorn();
+      renderItems();
+    });
+    box.appendChild(b);
+  });
+}
+
+function renderCats(){
+  const box = document.getElementById("cats");
+  box.innerHTML = "";
+  CATS.forEach(c => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = c;
+    if (c === cat) b.className = "on";
+    b.addEventListener("click", () => { cat = c; renderCats(); renderItems(); });
+    box.appendChild(b);
+  });
+}
+
+function renderActs(){
+  const box = document.getElementById("acts");
+  box.innerHTML = "";
+  ACTS.forEach(([phrase, short]) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = short;
+    if (act === phrase) b.className = "on";
+    b.addEventListener("click", () => {
+      act = phrase;
+      document.getElementById("sentence").innerHTML = "This is me. I will <span>" + phrase + ".</span>";
+      renderActs();
+    });
+    box.appendChild(b);
+  });
+}
+
+document.getElementById("clearClothes").addEventListener("click", () => {
+  Object.keys(worn).forEach(k => { worn[k] = null; place[k] = null; });
+  selectedSlot = null;
+  renderWorn(); renderItems();
+});
+document.getElementById("resetPlace").addEventListener("click", () => {
+  const keys = selectedSlot ? [selectedSlot] : Object.keys(worn);
+  keys.forEach(k => { if (worn[k]) place[k] = defaultsFor(worn[k]); });
+  renderWorn();
+});
+let guideOn = true;
+document.getElementById("guideBtn").addEventListener("click", () => {
+  guideOn = !guideOn;
+  document.getElementById("guide").style.display = guideOn ? "" : "none";
+  document.getElementById("guideBtn").textContent = guideOn ? "Hide guide" : "Show guide";
+});
+
+function setMode(draw){
+  dressMode = !draw;
+  document.getElementById("dressBox").hidden = draw;
+  document.getElementById("drawBox").hidden = !draw;
+  document.getElementById("modeDress").className = draw ? "" : "on";
+  document.getElementById("modeDraw").className = draw ? "on" : "";
+  document.getElementById("over").classList.toggle("live", draw);
+  renderWorn();
+}
+document.getElementById("modeDress").onclick = () => setMode(false);
+document.getElementById("modeDraw").onclick = () => setMode(true);
+setMode(true);
+
+const sw = document.getElementById("swatches");
+COLOURS.forEach((c, i) => {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "swatch" + (i === 1 ? " on" : "");
+  b.style.background = c;
+  b.title = i === 5 ? "Black" : (i > 5 ? "Hair" : "Skin");
+  b.addEventListener("click", () => {
+    colour = c; erasing = false;
+    document.getElementById("eraser").classList.remove("on");
+    [...sw.children].forEach(x => x.classList.remove("on"));
+    b.classList.add("on");
+  });
+  sw.appendChild(b);
+});
+document.querySelectorAll(".size").forEach(b => {
+  b.addEventListener("click", () => {
+    size = Number(b.dataset.size);
+    document.querySelectorAll(".size").forEach(x => x.classList.remove("on"));
+    b.classList.add("on");
+  });
+});
+document.getElementById("eraser").onclick = () => {
+  erasing = !erasing;
+  document.getElementById("eraser").classList.toggle("on", erasing);
+};
+function setLayer(){
+  layer = "over";
+  const overEl = document.getElementById("over");
+  if (overEl) overEl.classList.toggle("live", !dressMode);
+}
+setLayer();
+
+const under = document.getElementById("under");
+const over = document.getElementById("over");
+function fitCanvas(cv){
+  const r = cv.parentElement.getBoundingClientRect();
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+  if (cv.width === w && cv.height === h) return;
+  const snap = document.createElement("canvas");
+  snap.width = cv.width; snap.height = cv.height;
+  snap.getContext("2d").drawImage(cv, 0, 0);
+  cv.width = w; cv.height = h;
+  cv.getContext("2d").drawImage(snap, 0, 0, w, h);
+}
+function fitAll(){ fitCanvas(under); fitCanvas(over); }
+window.addEventListener("resize", fitAll);
+fitAll();
+
+function pushUndo(which){
+  const cv = which === "over" ? over : under;
+  try { undo[which].push(cv.toDataURL()); } catch (e) {}
+  if (undo[which].length > 12) undo[which].shift();
+}
+document.getElementById("undoBtn").onclick = () => {
+  const stack = undo[layer];
+  const data = stack.pop();
+  if (!data) return;
+  const cv = layer === "over" ? over : under;
+  const img = new Image();
+  img.onload = () => {
+    const ctx = cv.getContext("2d");
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    ctx.drawImage(img, 0, 0, cv.width, cv.height);
+  };
+  img.src = data;
+};
+document.getElementById("clearDraw").onclick = () => {
+  pushUndo("under"); pushUndo("over");
+  under.getContext("2d").clearRect(0, 0, under.width, under.height);
+  over.getContext("2d").clearRect(0, 0, over.width, over.height);
+};
+
+function bindPaint(cv, which){
+  const ctx = () => cv.getContext("2d");
+  let drawing = false;
+  let last = null;
+  function pos(e){
+    const r = cv.getBoundingClientRect();
+    const p = e.touches ? e.touches[0] : e;
+    return {
+      x: (p.clientX - r.left) / r.width * cv.width,
+      y: (p.clientY - r.top) / r.height * cv.height
+    };
+  }
+  function start(e){
+    if (layer !== which) return;
+    e.preventDefault();
+    pushUndo(which);
+    drawing = true;
+    last = pos(e);
+    dot(last);
+  }
+  function move(e){
+    if (!drawing || layer !== which) return;
+    e.preventDefault();
+    const p = pos(e);
+    const c = ctx();
+    c.lineCap = "round";
+    c.lineJoin = "round";
+    c.lineWidth = size * (cv.width / cv.getBoundingClientRect().width);
+    if (erasing) {
+      c.globalCompositeOperation = "destination-out";
+      c.strokeStyle = "rgba(0,0,0,1)";
+    } else {
+      c.globalCompositeOperation = "source-over";
+      c.strokeStyle = colour;
+    }
+    c.beginPath();
+    c.moveTo(last.x, last.y);
+    c.lineTo(p.x, p.y);
+    c.stroke();
+    last = p;
+  }
+  function dot(p){
+    const c = ctx();
+    c.lineCap = "round";
+    c.lineWidth = size * (cv.width / cv.getBoundingClientRect().width);
+    if (erasing) c.globalCompositeOperation = "destination-out";
+    else { c.globalCompositeOperation = "source-over"; c.fillStyle = colour; }
+    c.beginPath();
+    c.arc(p.x, p.y, c.lineWidth / 2, 0, Math.PI * 2);
+    c.fill();
+  }
+  function end(){ drawing = false; last = null; }
+  cv.addEventListener("pointerdown", start);
+  cv.addEventListener("pointermove", move);
+  window.addEventListener("pointerup", end);
+  cv.addEventListener("touchstart", start, {passive:false});
+  cv.addEventListener("touchmove", move, {passive:false});
+  window.addEventListener("touchend", end);
+}
+bindPaint(over, "over");
+setLayer();
+
+function loadImage(url){
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.onload = () => res(img);
+    img.onerror = rej;
+    img.src = url;
+  });
+}
+function fileName(){
+  const raw = (document.getElementById("pupilName").value || "pupil").trim();
+  const safe = raw.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "") || "pupil";
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-");
+  return safe + "-" + stamp + ".png";
+}
+function setStatus(text){
+  const el = document.getElementById("status");
+  if (el) el.textContent = text;
+}
+function downloadBlob(blob, name){
+  const a = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+async function buildPicture(){
+  const W = 900, H = 1180;
+  const out = document.createElement("canvas");
+  out.width = W; out.height = H;
+  const c = out.getContext("2d");
+  c.fillStyle = "#fff8ee";
+  c.fillRect(0, 0, W, H);
+  c.fillStyle = "#1f4e9a";
+  c.fillRect(0, 0, W, 74);
+  c.fillStyle = "white";
+  c.font = "700 36px Trebuchet MS, Segoe UI, sans-serif";
+  c.fillText("This is me", 36, 48);
+  const stageEl = document.getElementById("stage");
+  const rect = stageEl.getBoundingClientRect();
+  c.save();
+  c.translate(40, 96);
+  c.scale(820 / rect.width, 960 / rect.height);
+  c.fillStyle = "#fffdf8";
+  c.fillRect(0, 0, rect.width, rect.height);
+  c.drawImage(under, 0, 0, rect.width, rect.height);
+  const order = ["bottom", "shoes", "top", "pads", "helmet"];
+  for (const key of order) {
+    const item = worn[key];
+    if (!item) continue;
+    const img = await loadImage(src(item.id));
+    const slot = slots[key];
+    const sr = slot.getBoundingClientRect();
+    const x = sr.left - rect.left;
+    const y = sr.top - rect.top;
+    const w = sr.width;
+    const h = img.height * (w / img.width);
+    c.drawImage(img, x, y, w, h);
+  }
+  c.drawImage(over, 0, 0, rect.width, rect.height);
+  c.restore();
+  const who = (document.getElementById("pupilName").value || "").trim();
+  const line = (who ? who + ". " : "") + (act ? ("This is me. I will " + act + ".") : "This is me. I will …");
+  c.fillStyle = "#1c2430";
+  c.font = "700 28px Trebuchet MS, Segoe UI, sans-serif";
+  c.fillText(line, 40, 1120);
+  return await new Promise((res, rej) => out.toBlob(b => b ? res(b) : rej(new Error("Could not make the picture")), "image/png"));
+}
+const FOLDER_URL = "https://tccshk-my.sharepoint.com/:f:/g/personal/dan_tccs_edu_hk/IgBQtHSGo1MvQZzsX0pCl6v4AfB3komfVDfLGwWTklJy9a8?e=rATVO7";
+const FOLDER_PATH = "/personal/dan_tccs_edu_hk/Documents/LITTLE LIGHTS 2026-2027/P4/Dress Game";
+async function trySharePoint(blob, name){
+  const root = "https://tccshk-my.sharepoint.com/personal/dan_tccs_edu_hk";
+  const info = await fetch(root + "/_api/contextinfo", { method: "POST", credentials: "include", headers: { Accept: "application/json;odata=verbose" } });
+  if (!info.ok) throw new Error("not signed in");
+  const digest = (await info.json()).d.GetContextWebInformation.FormDigestValue;
+  const url = root + "/_api/web/GetFolderByServerRelativeUrl('" + encodeURIComponent(FOLDER_PATH).replace(/%2F/g, "/") + "')/Files/add(url='" + encodeURIComponent(name) + "',overwrite=true)";
+  const up = await fetch(url, {
+    method: "POST",
+    credentials: "include",
+    headers: { Accept: "application/json;odata=verbose", "X-RequestDigest": digest },
+    body: blob
+  });
+  if (!up.ok) throw new Error("upload " + up.status);
+}
+async function sendPicture(){
+  setStatus("Making the picture…");
+  try {
+    const blob = await buildPicture();
+    const name = fileName();
+    try {
+      await trySharePoint(blob, name);
+      setStatus("Sent to the class folder as " + name + ".");
+    } catch (err) {
+      downloadBlob(blob, name);
+      window.open(FOLDER_URL, "_blank", "noopener");
+      setStatus("The school login blocked a direct send, so " + name + " downloaded instead. Drop that file into the class folder that just opened.");
+    }
+  } catch (err) {
+    setStatus("Could not make the picture. Stay on this page and try Download only.");
+  }
+}
+async function downloadOnly(){
+  setStatus("Making the picture…");
+  try {
+    const blob = await buildPicture();
+    downloadBlob(blob, fileName());
+    setStatus("Downloaded. Check the Downloads folder.");
+  } catch (err) {
+    setStatus("Could not make the picture.");
+  }
+}
+document.getElementById("saveBtn").onclick = sendPicture;
+document.getElementById("saveBtn2").onclick = sendPicture;
+document.getElementById("downloadBtn").onclick = downloadOnly;
+
+const pointers = new Map();
+let gesture = null;
+
+function stagePoint(e){
+  const r = stage.getBoundingClientRect();
+  return {
+    x: (e.clientX - r.left) / r.width * 100,
+    y: (e.clientY - r.top) / r.height * 100
+  };
+}
+function slotFromTarget(node){
+  const el = node && node.closest ? node.closest(".slot") : null;
+  if (!el || !el.id) return null;
+  return Object.keys(slots).find(k => slots[k] === el) || null;
+}
+
+stage.addEventListener("pointerdown", (e) => {
+  if (!dressMode) return;
+  const hit = slotFromTarget(e.target);
+  const key = pointers.size === 0 ? hit : (selectedSlot || hit);
+  if (!key || !worn[key]) return;
+  if (pointers.size === 0 && !hit) return;
+  e.preventDefault();
+  selectSlot(key);
+  try { stage.setPointerCapture(e.pointerId); } catch (err) {}
+  pointers.set(e.pointerId, stagePoint(e));
+  const resizing = e.target.classList && e.target.classList.contains("handle");
+  if (pointers.size === 1) {
+    const p = place[key];
+    const pt = stagePoint(e);
+    gesture = resizing
+      ? { type: "resize", key, startW: p.w, startDist: Math.hypot(pt.x - p.x, pt.y - p.y) || 1 }
+      : { type: "move", key, dx: pt.x - p.x, dy: pt.y - p.y };
+  } else if (pointers.size >= 2) {
+    const pts = [...pointers.values()];
+    const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1;
+    const mid = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
+    const p = place[key];
+    gesture = { type: "pinch", key, dist, w: p.w, mid, x: p.x, y: p.y };
+  }
+});
+stage.addEventListener("pointermove", (e) => {
+  if (!pointers.has(e.pointerId) || !gesture) return;
+  pointers.set(e.pointerId, stagePoint(e));
+  const p = place[gesture.key];
+  if (!p) return;
+  if (gesture.type === "pinch" && pointers.size >= 2) {
+    const pts = [...pointers.values()];
+    const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1;
+    const mid = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
+    p.w = Math.max(12, Math.min(120, gesture.w * (dist / gesture.dist)));
+    p.x = Math.max(-10, Math.min(110, gesture.x + (mid.x - gesture.mid.x)));
+    p.y = Math.max(-5, Math.min(105, gesture.y + (mid.y - gesture.mid.y)));
+  } else if (gesture.type === "move") {
+    const pt = stagePoint(e);
+    p.x = Math.max(-10, Math.min(110, pt.x - gesture.dx));
+    p.y = Math.max(-5, Math.min(105, pt.y - gesture.dy));
+  } else if (gesture.type === "resize") {
+    const pt = stagePoint(e);
+    const dist = Math.hypot(pt.x - p.x, pt.y - p.y) || 1;
+    p.w = Math.max(12, Math.min(120, gesture.startW * (dist / gesture.startDist)));
+  }
+  applyPlace(gesture.key);
+});
+function endPointer(e){
+  pointers.delete(e.pointerId);
+  if (pointers.size === 0) gesture = null;
+  else if (pointers.size === 1 && gesture && gesture.type === "pinch") {
+    const key = gesture.key;
+    const pt = [...pointers.values()][0];
+    const p = place[key];
+    gesture = { type: "move", key, dx: pt.x - p.x, dy: pt.y - p.y };
+  }
+}
+stage.addEventListener("pointerup", endPointer);
+stage.addEventListener("pointercancel", endPointer);
+stage.addEventListener("wheel", (e) => {
+  if (!dressMode || !selectedSlot || !place[selectedSlot]) return;
+  e.preventDefault();
+  const p = place[selectedSlot];
+  p.w = Math.max(12, Math.min(120, p.w * (e.deltaY < 0 ? 1.06 : 0.94)));
+  applyPlace(selectedSlot);
+}, { passive: false });
+
+renderCats();
+renderItems();
+renderActs();
+renderWorn();
+</script>
+</body>
+</html>
