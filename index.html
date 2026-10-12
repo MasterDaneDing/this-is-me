@@ -191,7 +191,7 @@
       <div class="slot helmet" id="slotHelmet"></div>
       <canvas class="paint over" id="over"></canvas>
     </div>
-    <div class="sentence" id="sentence">This is me. I will <span>…</span></div>
+    <div class="sentence" id="sentence">I am <span id="nameBit">…</span>. This is me. I will <span id="actBit">…</span></div>
   </section>
   <section class="panel">
     <div class="modes">
@@ -227,6 +227,8 @@
     <div class="acts" id="acts"></div>
     <div class="label">Your name</div>
     <input id="pupilName" type="text" maxlength="40" placeholder="Name" style="width:100%;max-width:280px;border:2px solid #1c2430;border-radius:12px;padding:8px 10px;font:inherit">
+    <div class="label">Or type your own activity</div>
+    <input id="customAct" type="text" maxlength="40" placeholder="play football" style="width:100%;max-width:280px;border:2px solid #1c2430;border-radius:12px;padding:8px 10px;font:inherit">
     <div class="bar">
       <button type="button" id="saveBtn2">Send to Drive</button>
       <button type="button" class="ghost" id="downloadBtn">Download only</button>
@@ -430,7 +432,8 @@ function renderActs(){
     if (act === phrase) b.className = "on";
     b.addEventListener("click", () => {
       act = phrase;
-      document.getElementById("sentence").innerHTML = "This is me. I will <span>" + phrase + ".</span>";
+      document.getElementById("customAct").value = "";
+      updateSentence();
       renderActs();
     });
     box.appendChild(b);
@@ -631,6 +634,27 @@ function downloadBlob(blob, name){
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
+
+function currentAct(){
+  const typed = (document.getElementById("customAct").value || "").trim();
+  return typed || act || "";
+}
+function updateSentence(){
+  const who = (document.getElementById("pupilName").value || "").trim();
+  const doing = currentAct();
+  document.getElementById("nameBit").textContent = who || "…";
+  document.getElementById("actBit").textContent = doing ? (doing + ".") : "…";
+}
+document.getElementById("pupilName").addEventListener("input", updateSentence);
+document.getElementById("customAct").addEventListener("input", () => {
+  if ((document.getElementById("customAct").value || "").trim()) {
+    document.querySelectorAll("#acts button").forEach(b => b.classList.remove("on"));
+  } else {
+    renderActs();
+  }
+  updateSentence();
+});
+
 async function buildPicture(){
   const W = 900, H = 1180;
   const out = document.createElement("canvas");
@@ -667,10 +691,25 @@ async function buildPicture(){
   c.drawImage(over, 0, 0, rect.width, rect.height);
   c.restore();
   const who = (document.getElementById("pupilName").value || "").trim();
-  const line = (who ? who + ". " : "") + (act ? ("This is me. I will " + act + ".") : "This is me. I will …");
+  const doing = currentAct();
+  const line = "I am " + (who || "…") + ". This is me. I will " + (doing || "…") + ".";
   c.fillStyle = "#1c2430";
-  c.font = "700 28px Trebuchet MS, Segoe UI, sans-serif";
-  c.fillText(line, 40, 1120);
+  c.font = "700 26px Trebuchet MS, Segoe UI, sans-serif";
+  const maxW = 740;
+  const words = line.split(" ");
+  let row = "";
+  let y = 1100;
+  for (const word of words) {
+    const trial = row ? row + " " + word : word;
+    if (c.measureText(trial).width > maxW && row) {
+      c.fillText(row, 40, y);
+      y += 32;
+      row = word;
+    } else {
+      row = trial;
+    }
+  }
+  if (row) c.fillText(row, 40, y);
   return await new Promise((res, rej) => out.toBlob(b => b ? res(b) : rej(new Error("Could not make the picture")), "image/png"));
 }
 const UPLOAD_URL = "https://script.google.com/macros/s/AKfycbzo5adBLuAfj39f6G1Emu9z57-Fa31SHEjHJGkwRgwdjgnuz47Sb4La17MEtY7YiRAA/exec";
