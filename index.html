@@ -714,6 +714,29 @@ async function buildPicture(){
 }
 const UPLOAD_URL = "https://script.google.com/macros/s/AKfycbzo5adBLuAfj39f6G1Emu9z57-Fa31SHEjHJGkwRgwdjgnuz47Sb4La17MEtY7YiRAA/exec";
 const FOLDER_URL = "https://drive.google.com/drive/folders/1v2EqJUE_XqLs6-2jucBA2FPlHnULknz_";
+const SEND_LIMIT = 3;
+const SEND_KEY = "thisisme-drive-sends";
+function sendsUsed(){
+  return Math.max(0, parseInt(localStorage.getItem(SEND_KEY) || "0", 10) || 0);
+}
+function sendsLeft(){
+  return Math.max(0, SEND_LIMIT - sendsUsed());
+}
+function refreshSendButtons(){
+  const left = sendsLeft();
+  const locked = left <= 0;
+  ["saveBtn", "saveBtn2"].forEach(id => {
+    const b = document.getElementById(id);
+    if (!b) return;
+    b.disabled = locked;
+    b.style.opacity = locked ? "0.45" : "";
+  });
+  const b2 = document.getElementById("saveBtn2");
+  if (b2) b2.textContent = locked ? "Send limit reached" : ("Send to Drive (" + left + " left)");
+  const b1 = document.getElementById("saveBtn");
+  if (b1) b1.textContent = locked ? "Limit reached" : "Send picture";
+  if (locked) setStatus("You have used all 3 sends on this iPad. You can still Download only.");
+}
 function blobToBase64(blob){
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -739,17 +762,26 @@ async function sendToDrive(blob, name){
   if (out && out.ok === false) throw new Error(out.error || "upload failed");
 }
 async function sendPicture(){
+  if (sendsLeft() <= 0) {
+    refreshSendButtons();
+    return;
+  }
   setStatus("Making the picture…");
   try {
     const blob = await buildPicture();
     const name = fileName();
     try {
       await sendToDrive(blob, name);
-      setStatus("Sent to the class folder as " + name + ".");
+      localStorage.setItem(SEND_KEY, String(sendsUsed() + 1));
+      const left = sendsLeft();
+      setStatus(left
+        ? ("Sent as " + name + ". " + left + " send" + (left === 1 ? "" : "s") + " left on this iPad.")
+        : ("Sent as " + name + ". That was the last send on this iPad."));
+      refreshSendButtons();
     } catch (err) {
       downloadBlob(blob, name);
       window.open(FOLDER_URL, "_blank", "noopener");
-      setStatus("Could not send " + name + ". It downloaded instead. Drop it in the class folder that just opened.");
+      setStatus("Could not send " + name + ". It downloaded instead. That did not use a send.");
     }
   } catch (err) {
     setStatus("Could not make the picture. Stay on this page and try Download only.");
@@ -768,6 +800,7 @@ async function downloadOnly(){
 document.getElementById("saveBtn").onclick = sendPicture;
 document.getElementById("saveBtn2").onclick = sendPicture;
 document.getElementById("downloadBtn").onclick = downloadOnly;
+refreshSendButtons();
 
 const pointers = new Map();
 let gesture = null;
